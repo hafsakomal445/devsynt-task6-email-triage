@@ -1,0 +1,1498 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -112,
+        -80
+      ],
+      "id": "7be2e402-dfdb-4c74-8953-ebf238690b39",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "ORYYemaY3FzOjNhH",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3.6-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-3.6-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are an email triage classifier for a real-estate company's inbox.\n\nClassify the following email into ONE of these categories:\ngeneral_query, sales_inquiry, job_application, project_related, internal_communication, meeting_request, urgent_request, complaint, promotional, spam, other\n\nAlso assign a priority: low, medium, high\nAnd decide requires_human: true or false\n\nRespond ONLY with valid JSON in this exact format, no other text:\n{\n  \"category\": \"...\",\n  \"priority\": \"...\",\n  \"requires_human\": true/false,\n  \"reasoning\": \"one short sentence\"\n}\n\nEmail subject: {{ $('Gmail Trigger').item.json.subject }}\nEmail from: {{ $('Gmail Trigger').item.json.from.text }}\nEmail body: {{ $('Gmail Trigger').item.json.text }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        560,
+        16
+      ],
+      "id": "ff55002e-fb40-4f49-a8c7-e65fd48c385f",
+      "name": "Message a model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "FFkoZYVqMhwGNcD4",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.content.parts[0].text;\nlet parsed;\ntry {\n  parsed = JSON.parse(raw);\n} catch (e) {\n  parsed = {\n    category: \"other\",\n    priority: \"medium\",\n    requires_human: true,\n    reasoning: \"Failed to parse AI response\"\n  };\n}\n\n// Group categories into simple routing buckets\nconst routeMap = {\n  general_query: \"rag\",\n  sales_inquiry: \"rag\",\n  job_application: \"hr\",\n  project_related: \"manager\",\n  internal_communication: \"manager\",\n  complaint: \"manager\",\n  meeting_request: \"meeting\",\n  urgent_request: \"urgent\",\n  promotional: \"archive\",\n  spam: \"archive\",\n};\nparsed.route = routeMap[parsed.category] || \"human_review\";\n\nconst emailData = $('Gmail Trigger').first().json; // check your actual node name\n\nreturn [{\n  json: {\n    ...parsed,\n    subject: emailData.subject,\n    from: emailData.from.text,\n    to: emailData.to.text,\n    messageId: emailData.messageId,\n    body: emailData.text\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        16
+      ],
+      "id": "a7cb8aa4-e917-4eb8-9546-45f284110a91",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "rag",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "9e6980e9-6a22-4b3e-a893-2b527e3c66f0"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Rag"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "55050220-bc59-4e67-81d9-2916b684615c",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "hr",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "HR"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "e0b3bef4-d41d-4ccd-baff-e56bcfcf51cb",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "manager",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Manager"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "591a9076-6b15-4dde-afdc-35a99bebd09d",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "meeting",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Meeting"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "49bdf6c2-d449-403d-b28f-2f9d56b0405a",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "urgent",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Urgent"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "e208953e-eeae-4d29-8a38-56e131f2c585",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "archive",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Archive"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "a5575527-bec4-41d3-9260-c53ff6cbd158",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "human_review",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Human Review"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1136,
+        -64
+      ],
+      "id": "35284e67-9f11-4928-94b2-6a85495915cf",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8000/chat",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "question",
+              "value": "={{ $json.subject }} - {{ $json.body }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1360,
+        -368
+      ],
+      "id": "885b8ada-a509-4f08-abc8-fd3722e3bd01",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "sendTo": "=  {{ $('Code in JavaScript').item.json.from }}",
+        "subject": "=  Re: {{ $('Code in JavaScript').item.json.subject }}",
+        "message": "=  {{ $json.answer }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2032,
+        -464
+      ],
+      "id": "71fd6d01-7857-4c2d-a33d-825b36bbb116",
+      "name": "Send a message",
+      "webhookId": "4c7898c6-4b37-498c-bb1d-b1a5e2afca12",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "ORYYemaY3FzOjNhH",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "dukaanonline9@gmail.com",
+        "subject": "=  [Job Application] {{ $('Code in JavaScript').item.json.subject }}",
+        "message": "=  New job application received.    From: {{ $('Code in JavaScript').item.json.from }}   Priority: {{ $('Code in JavaScript').item.json.priority }}    --- Original Message ---   {{ $('Code in JavaScript').item.json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1360,
+        -560
+      ],
+      "id": "e95595ae-7016-4bf1-a2ba-67a4f53531ff",
+      "name": "Send a message1",
+      "webhookId": "490d39ef-dde1-4bed-8958-80b36f4cc53a",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "ORYYemaY3FzOjNhH",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://discord.com/api/webhooks/1547567019606540318/KYTbpROtcYMvl5VEu38BoPe4Jdr6G0pEP1e3a6eUt5QcmEXwKVwHD7uTOLniFd266-wc",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "=🔔 New Job Application From: {{ $('Code in JavaScript').item.json.from }} Subject: {{ $('Code in JavaScript').item.json.subject }} Priority: {{ $('Code in JavaScript').item.json.priority }} Forwarded to HR."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1584,
+        -560
+      ],
+      "id": "1a348279-6bd7-496b-8625-b8beacb107b8",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "sendTo": "dukaanonline9@gmail.com",
+        "subject": "=   [Project/Internal] {{ $('Code in JavaScript').item.json.subject }}",
+        "message": "=   New project/internal/complaint email requiring manager attention.     From: {{ $('Code in JavaScript').item.json.from }}    Category: {{ $('Code in JavaScript').item.json.category }}    Priority: {{ $('Code in JavaScript').item.json.priority }}     --- Original Message ---    {{ $('Code in JavaScript').item.json.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1360,
+        16
+      ],
+      "id": "7a0424e3-0c00-4f1a-b06b-0b4b2c079602",
+      "name": "Send a message2",
+      "webhookId": "6e59b264-6784-4c40-a644-a4e45735f1be",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "ORYYemaY3FzOjNhH",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://discord.com/api/webhooks/1547569692556656730/iLLvvPh6RGWDNWHL7wgFFGseJQxndtiRX_rScgdsU61KJRGyKcXCjcQhKde4Jq3qlsCb",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "=   📋 New Manager Alert    Category: {{ $('Code in JavaScript').item.json.category }}    From: {{ $('Code in JavaScript').item.json.from }}    Subject: {{ $('Code in JavaScript').item.json.subject }}    Priority: {{ $('Code in JavaScript').item.json.priority }}    Forwarded to Manager."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1584,
+        16
+      ],
+      "id": "ae27b582-8fad-4097-8dff-c7420fbe2038",
+      "name": "HTTP Request2"
+    },
+    {
+      "parameters": {
+        "sendTo": "dukaanonline9@gmail.com",
+        "subject": "=[Meeting Request] {{ $('Code in JavaScript').item.json.subject }}",
+        "message": "=   New meeting request — needs human review and scheduling.     From: {{ $('Code in JavaScript').item.json.from }}    Priority: {{ $('Code in JavaScript').item.json.priority }}     --- Original Message ---    {{ $('Code in JavaScript').item.json.body }}     Note: Do not auto-schedule. Please respond manually to confirm.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1360,
+        208
+      ],
+      "id": "95e7ddb3-f642-4489-bad0-cf8fb2c6a9b2",
+      "name": "Send a message3",
+      "webhookId": "65346127-8be2-4c97-9861-1fc2137b0b5a",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "ORYYemaY3FzOjNhH",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://discord.com/api/webhooks/1547571810244235357/xgT3DEUIHf9RHPepCueK-A7SMG-4vRK6wuFYhizFwIUgqrzI61tViXj_JJQxyVdrM6xJ",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "=   📅 New Meeting Request    From: {{ $('Code in JavaScript').item.json.from }}    Subject: {{ $('Code in JavaScript').item.json.subject }}    Please review and respond manually — no auto-scheduling."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1584,
+        208
+      ],
+      "id": "cf30dc7e-6cc3-414f-a560-9d1603766196",
+      "name": "HTTP Request3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://discord.com/api/webhooks/1547853696178724964/4EF4mnghKbb1XXCy2szLM2shux7t6t5EH9aqbnYKAbDjNtSnFS8z1jPr9LGvycYRkvKT",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "=   🚨 URGENT — Immediate Attention Required    From: {{ $('Code in JavaScript').item.json.from }}    Subject: {{ $('Code in JavaScript').item.json.subject }}    Reasoning: {{ $('Code in JavaScript').item.json.reasoning }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1360,
+        -176
+      ],
+      "id": "4843b6a5-419e-4d23-a6b5-d7fcced3ed90",
+      "name": "HTTP Request4"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1360,
+        400
+      ],
+      "id": "01e6b1ec-58c8-4113-a8f6-d7f40978c9bd",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://discord.com/api/webhooks/1548953644899246083/82mIa8Bf3IdEqeZNXVZzvod_T1FbyMhwfJskdubkFfgQ7emFcKSllff8FPjY_KxY73zo",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "=   ⚠️ Needs Human Review    From: {{ $('Code in JavaScript').item.json.from }}    Subject: {{ $('Code in JavaScript').item.json.subject }}    Category: {{ $('Code in JavaScript').item.json.category }}    Reasoning: {{ $('Code in JavaScript').item.json.reasoning }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1360,
+        592
+      ],
+      "id": "0a56270d-6245-438d-b4b7-596c3884bed3",
+      "name": "HTTP Request5"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "5c4d2572-4691-4d89-a255-723176eba88c",
+              "leftValue": "={{ $json.isGroundedFlag }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1808,
+        -368
+      ],
+      "id": "080487ac-3162-4401-bed3-4bb6aca9ac04",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://discord.com/api/webhooks/1548953644899246083/82mIa8Bf3IdEqeZNXVZzvod_T1FbyMhwfJskdubkFfgQ7emFcKSllff8FPjY_KxY73zo",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "=⚠️ Sales/General Query — No Answer Found From: {{ $('Code in JavaScript').item.json.from }} Subject: {{ $('Code in JavaScript').item.json.subject }} Question: {{ $('Code in JavaScript').item.json.body }} RAG could not find an answer — needs human response."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2032,
+        -272
+      ],
+      "id": "eddf67b9-e6b3-476a-a005-242dbfa5434a",
+      "name": "HTTP Request6"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst isGrounded = data.grounded === true;\n\nreturn [{\n  json: {\n    ...data,\n    isGroundedFlag: isGrounded ? 1 : 0\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        -368
+      ],
+      "id": "e9c615dc-2c90-4c81-9b31-8e29a4f3ec9d",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "email_logs",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "message_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.messageId }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        112,
+        -80
+      ],
+      "id": "e98d3e52-6a96-4c6b-92eb-676264f41912",
+      "name": "Get many rows",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "RewvnMVb82QO2pjh",
+          "name": "Supabase account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f107bcdb-72cf-48a4-8f15-5e8a1fb749f3",
+              "leftValue": "=   {{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        336,
+        -80
+      ],
+      "id": "024732a8-1d3a-48be-8310-bb8c4d059821",
+      "name": "If1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        624,
+        -176
+      ],
+      "id": "19ce95ef-d66a-4fd4-afc2-1ffd136c2dc0",
+      "name": "No Operation, do nothing1"
+    },
+    {
+      "parameters": {
+        "tableId": "email_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "message_id",
+              "fieldValue": "={{ $('Gmail Trigger').item.json.messageId }}"
+            },
+            {
+              "fieldId": "sender",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.from }}"
+            },
+            {
+              "fieldId": "subject",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.subject }}"
+            },
+            {
+              "fieldId": "category",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.category }}"
+            },
+            {
+              "fieldId": "priority",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.priority }}"
+            },
+            {
+              "fieldId": "requires_human",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.requires_human }}"
+            },
+            {
+              "fieldId": "ai_decision",
+              "fieldValue": "RAG answer sent"
+            },
+            {
+              "fieldId": "action_taken",
+              "fieldValue": "email_reply"
+            },
+            {
+              "fieldId": "rag_used",
+              "fieldValue": "true"
+            },
+            {
+              "fieldId": "grounded",
+              "fieldValue": "true"
+            },
+            {
+              "fieldId": "response_sent",
+              "fieldValue": "true"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2256,
+        -464
+      ],
+      "id": "9ad7f2aa-4dbd-4793-ae14-9f0a7ab84719",
+      "name": "Create a row",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "RewvnMVb82QO2pjh",
+          "name": "Supabase account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "email_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "message_id",
+              "fieldValue": "={{ $('Gmail Trigger').item.json.messageId }}"
+            },
+            {
+              "fieldId": "sender",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.from }}"
+            },
+            {
+              "fieldId": "subject",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.subject }}"
+            },
+            {
+              "fieldId": "category",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.category }}"
+            },
+            {
+              "fieldId": "priority",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.priority }}"
+            },
+            {
+              "fieldId": "requires_human",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.requires_human }}"
+            },
+            {
+              "fieldId": "ai_decision",
+              "fieldValue": "Forwarded to Manager"
+            },
+            {
+              "fieldId": "action_taken",
+              "fieldValue": "email_forward_discord_alert"
+            },
+            {
+              "fieldId": "rag_used",
+              "fieldValue": "true"
+            },
+            {
+              "fieldId": "grounded",
+              "fieldValue": "true"
+            },
+            {
+              "fieldId": "response_sent",
+              "fieldValue": "false"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1808,
+        16
+      ],
+      "id": "3ba0a732-9a9b-4734-9c91-95a01f0c5283",
+      "name": "Create a row1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "RewvnMVb82QO2pjh",
+          "name": "Supabase account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "email_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "message_id",
+              "fieldValue": "={{ $('Gmail Trigger').item.json.messageId }}"
+            },
+            {
+              "fieldId": "sender",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.from }}"
+            },
+            {
+              "fieldId": "subject",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.subject }}"
+            },
+            {
+              "fieldId": "category",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.category }}"
+            },
+            {
+              "fieldId": "priority",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.priority }}"
+            },
+            {
+              "fieldId": "requires_human",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.requires_human }}"
+            },
+            {
+              "fieldId": "ai_decision",
+              "fieldValue": "RAG answer sent"
+            },
+            {
+              "fieldId": "action_taken",
+              "fieldValue": "email_reply"
+            },
+            {
+              "fieldId": "rag_used",
+              "fieldValue": "true"
+            },
+            {
+              "fieldId": "grounded",
+              "fieldValue": "true"
+            },
+            {
+              "fieldId": "response_sent",
+              "fieldValue": "true"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1584,
+        592
+      ],
+      "id": "07eb3620-3d27-4671-9360-6d81d842561e",
+      "name": "Create a row2",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "RewvnMVb82QO2pjh",
+          "name": "Supabase account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "email_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "message_id",
+              "fieldValue": "={{ $('Gmail Trigger').item.json.messageId }}"
+            },
+            {
+              "fieldId": "sender",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.from }}"
+            },
+            {
+              "fieldId": "subject",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.subject }}"
+            },
+            {
+              "fieldId": "category",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.category }}"
+            },
+            {
+              "fieldId": "priority",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.priority }}"
+            },
+            {
+              "fieldId": "requires_human",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.requires_human }}"
+            },
+            {
+              "fieldId": "ai_decision",
+              "fieldValue": "Meeting request — notified responsible person"
+            },
+            {
+              "fieldId": "action_taken",
+              "fieldValue": "email_forward_discord_alert"
+            },
+            {
+              "fieldId": "rag_used",
+              "fieldValue": "false"
+            },
+            {
+              "fieldId": "grounded",
+              "fieldValue": "true"
+            },
+            {
+              "fieldId": "response_sent",
+              "fieldValue": "true"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1808,
+        208
+      ],
+      "id": "5a2a6cac-d547-41c6-8369-9da7ca918ee7",
+      "name": "Create a row3",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "RewvnMVb82QO2pjh",
+          "name": "Supabase account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "email_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "message_id",
+              "fieldValue": "={{ $('Gmail Trigger').item.json.messageId }}"
+            },
+            {
+              "fieldId": "sender",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.from }}"
+            },
+            {
+              "fieldId": "subject",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.subject }}"
+            },
+            {
+              "fieldId": "category",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.category }}"
+            },
+            {
+              "fieldId": "priority",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.priority }}"
+            },
+            {
+              "fieldId": "requires_human",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.requires_human }}"
+            },
+            {
+              "fieldId": "ai_decision",
+              "fieldValue": "Urgent — immediate human notification sent"
+            },
+            {
+              "fieldId": "action_taken",
+              "fieldValue": "discord_alert"
+            },
+            {
+              "fieldId": "rag_used",
+              "fieldValue": "false"
+            },
+            {
+              "fieldId": "grounded",
+              "fieldValue": "true"
+            },
+            {
+              "fieldId": "response_sent",
+              "fieldValue": "true"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1584,
+        -176
+      ],
+      "id": "3f78b1ba-1aa7-4da4-a160-c6ae8379d33e",
+      "name": "Create a row5",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "RewvnMVb82QO2pjh",
+          "name": "Supabase account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "email_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "message_id",
+              "fieldValue": "={{ $('Gmail Trigger').item.json.messageId }}"
+            },
+            {
+              "fieldId": "sender",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.from }}"
+            },
+            {
+              "fieldId": "subject",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.subject }}"
+            },
+            {
+              "fieldId": "category",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.category }}"
+            },
+            {
+              "fieldId": "priority",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.priority }}"
+            },
+            {
+              "fieldId": "requires_human",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.requires_human }}"
+            },
+            {
+              "fieldId": "ai_decision",
+              "fieldValue": "Promotional/spam — archived, no action taken"
+            },
+            {
+              "fieldId": "action_taken",
+              "fieldValue": "archived"
+            },
+            {
+              "fieldId": "rag_used",
+              "fieldValue": "false"
+            },
+            {
+              "fieldId": "grounded",
+              "fieldValue": "true"
+            },
+            {
+              "fieldId": "response_sent",
+              "fieldValue": "true"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1584,
+        400
+      ],
+      "id": "2bbf9010-6525-496a-95a8-2b8e61741633",
+      "name": "Create a row6",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "RewvnMVb82QO2pjh",
+          "name": "Supabase account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "email_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "message_id",
+              "fieldValue": "={{ $('Gmail Trigger').item.json.messageId }}"
+            },
+            {
+              "fieldId": "sender",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.from }}"
+            },
+            {
+              "fieldId": "subject",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.subject }}"
+            },
+            {
+              "fieldId": "category",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.category }}"
+            },
+            {
+              "fieldId": "priority",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.priority }}"
+            },
+            {
+              "fieldId": "requires_human",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.requires_human }}"
+            },
+            {
+              "fieldId": "ai_decision",
+              "fieldValue": "Forwarded to HR"
+            },
+            {
+              "fieldId": "action_taken",
+              "fieldValue": "email_forward_discord_alert"
+            },
+            {
+              "fieldId": "rag_used",
+              "fieldValue": "false"
+            },
+            {
+              "fieldId": "grounded",
+              "fieldValue": "true"
+            },
+            {
+              "fieldId": "response_sent",
+              "fieldValue": "true"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1808,
+        -560
+      ],
+      "id": "e09626a9-6998-4d38-abd1-8d9ba9f4470d",
+      "name": "Create a row4",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "RewvnMVb82QO2pjh",
+          "name": "Supabase account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "email_logs",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "message_id",
+              "fieldValue": "={{ $('Gmail Trigger').item.json.messageId }}"
+            },
+            {
+              "fieldId": "sender",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.from }}"
+            },
+            {
+              "fieldId": "subject",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.subject }}"
+            },
+            {
+              "fieldId": "category",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.category }}"
+            },
+            {
+              "fieldId": "priority",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.priority }}"
+            },
+            {
+              "fieldId": "requires_human",
+              "fieldValue": "={{ $('Code in JavaScript').item.json.requires_human }}"
+            },
+            {
+              "fieldId": "ai_decision",
+              "fieldValue": "Escalated to human review — no answer found"
+            },
+            {
+              "fieldId": "action_taken",
+              "fieldValue": "discord_alert"
+            },
+            {
+              "fieldId": "rag_used",
+              "fieldValue": "true"
+            },
+            {
+              "fieldId": "grounded",
+              "fieldValue": "false"
+            },
+            {
+              "fieldId": "response_sent",
+              "fieldValue": "false"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2256,
+        -272
+      ],
+      "id": "9400da40-5880-4ca5-813b-8ca469e9f817",
+      "name": "Create a row7",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "RewvnMVb82QO2pjh",
+          "name": "Supabase account 4"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get many rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Create a row4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message2": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "Create a row1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message3": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request3": {
+      "main": [
+        [
+          {
+            "node": "Create a row3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request4": {
+      "main": [
+        [
+          {
+            "node": "Create a row5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing": {
+      "main": [
+        [
+          {
+            "node": "Create a row6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request5": {
+      "main": [
+        [
+          {
+            "node": "Create a row2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request6": {
+      "main": [
+        [
+          {
+            "node": "Create a row7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing1": {
+      "main": [
+        []
+      ]
+    },
+    "Create a row": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "fd9783f425fa133fcd049ce1f466e880c35dc77a33ce7e48d6d83e769a01b91e"
+  }
+}
